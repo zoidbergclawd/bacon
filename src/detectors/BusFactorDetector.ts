@@ -1,5 +1,7 @@
 import { execFileSync } from "child_process";
 import * as path from "path";
+import { parseBlameOutput } from "./utils/parse-blame";
+import type { Detector, DetectorContext, DetectorFinding } from "./types";
 
 export interface AuthorLineCount {
   author: string;
@@ -33,24 +35,8 @@ export interface BusFactorOptions {
   filePatterns?: string[];
 }
 
-/**
- * Parse git blame porcelain output into author -> line count map.
- */
-export function parseBlameOutput(output: string): Map<string, number> {
-  const authorCounts = new Map<string, number>();
-  const lines = output.split("\n");
-
-  for (const line of lines) {
-    if (line.startsWith("author ")) {
-      const author = line.slice("author ".length).trim();
-      if (author && author !== "Not Committed Yet") {
-        authorCounts.set(author, (authorCounts.get(author) ?? 0) + 1);
-      }
-    }
-  }
-
-  return authorCounts;
-}
+// Re-export parseBlameOutput from its utility module
+export { parseBlameOutput } from "./utils/parse-blame";
 
 /**
  * Calculate bus factor score from author line counts.
@@ -215,4 +201,44 @@ export function detect(options: BusFactorOptions = {}): BusFactorReport {
       overallBusFactor,
     },
   };
+}
+
+/**
+ * BusFactorDetector — implements the Detector interface.
+ * Discovers tracked files, runs git blame, calculates bus factor,
+ * and returns findings for files exceeding the ownership threshold.
+ */
+export class BusFactorDetector implements Detector {
+  name = "bus-factor";
+  description =
+    "Detects files with dangerous single-author concentration via git blame analysis";
+
+  async run(context: DetectorContext): Promise<DetectorFinding[]> {
+    const repoPath = path.resolve(context.projectRoot);
+    const threshold = (context.options.threshold as number) ?? 80;
+    const filePatterns = context.options.filePatterns as string[] | undefined;
+
+    const report = detect({ repoPath, threshold, filePatterns });
+    const findings: DetectorFinding[] = [];
+
+    for (const file of report.files) {
+      if (!file.flagged) continue;
+
+      const topAuthor = file.authors[0];
+      findings.push({
+        id: `bf-${findings.length + 1}`,
+        detectorName: this.name,
+        severity: file.busFactorScore === 1 ? "high" : "medium",
+        message: `${topAuthor.author} owns ${topAuthor.percentage}% of ${file.filePath} (bus factor: ${file.busFactorScore})`,
+        file: file.filePath,
+        metadata: {
+          busFactor: file.busFactorScore,
+          topAuthorPercentage: topAuthor.percentage,
+          authors: file.authors,
+        },
+      });
+    }
+
+    return findings;
+  }
 }
