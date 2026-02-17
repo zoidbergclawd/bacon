@@ -1,0 +1,12 @@
+{
+  "name": "risky-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "left-pad": "1.0.0",
+    "request": "2.88.2",
+    "lodash": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "5.0.0"
+  }
+}
