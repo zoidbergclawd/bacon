@@ -111,12 +111,12 @@ describe("calculateBusFactor", () => {
 
 describe("analyzeFile (integration)", () => {
   it("analyzes a real file in this repo", () => {
-    // Use AGENTS.md — has committed blame history (package.json may be uncommitted)
-    const result = analyzeFile("AGENTS.md", REPO_ROOT, 80);
+    // Use README.md — has committed blame history
+    const result = analyzeFile("README.md", REPO_ROOT, 80);
 
     expect(result).not.toBeNull();
     if (result) {
-      expect(result.filePath).toBe("AGENTS.md");
+      expect(result.filePath).toBe("README.md");
       expect(result.totalLines).toBeGreaterThan(0);
       expect(result.authors.length).toBeGreaterThan(0);
       expect(result.busFactorScore).toBeGreaterThanOrEqual(1);
